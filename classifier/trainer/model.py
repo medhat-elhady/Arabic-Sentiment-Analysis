@@ -43,8 +43,8 @@ def prepare_data(train_data_path):
 
 def build_classifier_model(dropout_rate=0.1):
     text_input = tf.keras.layers.Input(shape=(), dtype=tf.string, name="text")
-    processing_link = "https://kaggle.com/models/jeongukjae/distilbert/frameworks/TensorFlow2/variations/en-cased-preprocess/versions/2"
-    encoder_link = "https://www.kaggle.com/models/jeongukjae/distilbert/frameworks/TensorFlow2/variations/en-cased-l-6-h-768-a-12/versions/1"
+    processing_link = "https://kaggle.com/models/jeongukjae/distilbert/frameworks/TensorFlow2/variations/multi-cased-preprocess/versions/2"
+    encoder_link = "https://www.kaggle.com/models/jeongukjae/distilbert/frameworks/TensorFlow2/variations/multi-cased-l-6-h-768-a-12/versions/1"
     preprocessing_layer = hub.KerasLayer(processing_link)
 
     encoder_inputs = preprocessing_layer(text_input)
