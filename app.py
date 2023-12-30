@@ -77,7 +77,7 @@ def predict(text):
 
     res = predict_custom_trained_model_sample(
     project="1033908600341",
-    endpoint_id="7405476894885281792",
+    endpoint_id="1064408619547623424",
     location="us-central1",
     instances={ "text": text}
 )

@@ -17,45 +17,59 @@ import tensorflow_text as text
 from tensorflow.keras import callbacks
 #from google.cloud import aiplatform
 from official.nlp import optimization  # to create AdamW optmizer
-
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.model_selection import train_test_split
 import pandas as pd
 import numpy as np
 
 
 #'./data/ar_reviews_100k.tsv'
 def prepare_data(train_data_path):
+    
     df = pd.read_csv(train_data_path, sep='\t')
-    df = df[df['label']!='Mixed']
+    # split the data to train and test
+    # encode labels to be 0 & 1
     
-    msk = np.random.rand(len(df)) < 0.8
-    df_train = df[msk]
-    df_test = df[~msk]
-    
-    labels_train = df_train['label'].map({'Positive':1, 'Negative':0}).values
+
+    df_train, df_test = train_test_split(df, shuffle=True, stratify=df['label'], test_size=0.2)
+
+
+    #labels = tf.keras.utils.to_categorical(df['label'].values, 3)
+    oneencoder = OneHotEncoder()
+    labels_train = oneencoder.fit_transform(df_train['label'].values.reshape(-1, 1)).toarray()
     features_train = df_train['text'].values
-    
-    
-    labels_test = df_test['label'].map({'Positive':1, 'Negative':0}).values
+
+
+    labels_test = oneencoder.transform(df_test['label'].values.reshape(-1, 1)).toarray()
     features_test = df_test['text'].values
     
     return features_train, labels_train, features_test, labels_test
 
 
 def build_classifier_model(dropout_rate=0.1):
+    
+    # defining the URL of the smallBERT model to use
+    tfhub_handle_encoder = (
+        "https://www.kaggle.com/models/jeongukjae/distilbert/frameworks/TensorFlow2/variations/multi-cased-l-6-h-768-a-12/versions/1"
+    )
+
+    # defining the corresponding preprocessing model for the BERT model above
+    tfhub_handle_preprocess = (
+        "https://kaggle.com/models/jeongukjae/distilbert/frameworks/TensorFlow2/variations/multi-cased-preprocess/versions/2"
+    )
     text_input = tf.keras.layers.Input(shape=(), dtype=tf.string, name="text")
-    processing_link = "https://kaggle.com/models/jeongukjae/distilbert/frameworks/TensorFlow2/variations/multi-cased-preprocess/versions/2"
-    encoder_link = "https://www.kaggle.com/models/jeongukjae/distilbert/frameworks/TensorFlow2/variations/multi-cased-l-6-h-768-a-12/versions/1"
-    preprocessing_layer = hub.KerasLayer(processing_link)
+    preprocessing_layer = hub.KerasLayer(tfhub_handle_preprocess, name='precessing_layer')
 
     encoder_inputs = preprocessing_layer(text_input)
     
-    encoder = hub.KerasLayer(encoder_link,trainable=True)
+    encoder = hub.KerasLayer(tfhub_handle_encoder,
+                            trainable=True, name ='encoder_layer')
    
     outputs = encoder(encoder_inputs)
     net = outputs["pooled_output"]
     net = tf.keras.layers.Dropout(dropout_rate)(net)
     #net = tf.keras.layers.Dense(260, activation='relu')(net)
-    net = tf.keras.layers.Dense(1, activation="sigmoid", name="classifier")(net)
+    net = tf.keras.layers.Dense(3, activation="softmax", name="classifier")(net)
     return tf.keras.Model(text_input, net)
 
 
@@ -94,8 +108,9 @@ def train_and_evaluate(hparam):
     num_warmup_steps = int(0.1 * num_train_steps)
     
     
-    loss = tf.keras.losses.BinaryCrossentropy()
-    metrics = tf.keras.metrics.BinaryAccuracy()
+    loss = tf.keras.losses.CategoricalCrossentropy()
+    metrics = [tf.metrics.CategoricalAccuracy()]
+        
 
 
     optimizer = optimization.create_optimizer(
@@ -115,7 +130,7 @@ def train_and_evaluate(hparam):
         epochs=epochs, 
         batch_size=batch_size, 
         validation_data= (features_test, labels_test), 
-        callbacks=[checkpoint_cb, tensorboard_cb]
+        callbacks=[tensorboard_cb]
     )
 
 
